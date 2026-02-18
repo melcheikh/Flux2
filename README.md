@@ -1,3 +1,30 @@
+# Flux 2 NF4 Inference Repo
+
+Scripts optimized for running **Flux 2 [dev]** with 4-bit quantization on consumer GPUs (24GB VRAM).
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+Ensure you have the `flux2` Conda environment set up and activated.
+
+```bash
+conda activate flux2
+```
+
+### 2. Run Inference
+
+**Single Image (Interactive/Simple):**
+```bash
+python run_flux2_simple.py
+```
+
+**Batch Generation (Multiple Seeds):**
+```bash
+python run_flux2_batch.py --count 5 --prompt "A futuristic cityscape"
+```
+
+---
+
 # FLUX.2
 
 **Frontier Visual Intelligence** — State-of-the-art image generation and editing from [Black Forest Labs](https://bfl.ai).
