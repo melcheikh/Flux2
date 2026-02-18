@@ -1,5 +1,5 @@
 import torch
-from diffusers import Flux2Pipeline, AutoModel
+from diffusers import AutoModel, Flux2Pipeline
 from transformers import Mistral3ForConditionalGeneration
 
 # Official 4-bit loading script from flux2/docs/flux2_dev_hf.md
