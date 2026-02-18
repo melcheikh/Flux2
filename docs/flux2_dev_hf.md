@@ -1,6 +1,6 @@
 # 🧨 Running the model with diffusers
 
-## Getting started 
+## Getting started
 
 Install diffusers from `main` and upgrade your `transformers`, `accelerate` and `bitsandbytes` dependencies to latest
 
@@ -72,7 +72,7 @@ image.save("flux2_output.png")
 
 ### 4-bit transformer and 4-bit text-encoder (~20G of VRAM)
 
-Load both the text-encoder and the transformer in 4-bit. 
+Load both the text-encoder and the transformer in 4-bit.
 The text-encoder is offloaded from VRAM for the transformer to run with `pipe.enable_model_cpu_offload()`, making sure both will fit.
 
 ```py
@@ -107,7 +107,7 @@ image = pipe(
 ).images[0]
 
 image.save("flux2_output.png")
-``` 
+```
 
 To understand how different quantizations affect the model's abilities and quality, access the [FLUX.2 on diffusers](https://huggingface.co/blog/flux-2) blog
 
@@ -147,7 +147,7 @@ image.save("flux2_output.png")
 ```
 
 ### Remote text-encoder + H100
-`pipe.enable_model_cpu_offload()` slows you down a bit. You can move as fast as possible on the H100 with the remote text-encoder 
+`pipe.enable_model_cpu_offload()` slows you down a bit. You can move as fast as possible on the H100 with the remote text-encoder
 ```py
 import torch
 from diffusers import Flux2Pipeline

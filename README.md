@@ -74,7 +74,7 @@ Klein models define the Pareto frontier for quality vs. latency and VRAM across 
 
 ### Text-to-image examples
 
-Example focused on realism 
+Example focused on realism
 ![t2i-klein-grid](assets/t2i_klein_realism.jpg)
 
 Example focused on output diversity

@@ -52,7 +52,7 @@ and choose your prompt upsampling model interactively.
 
 ### 2. Local prompt upsampling
 
-Local prompt upsampling uses [`Mistral-Small-3.2-24B-Instruct-2506`](https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506), which is the model we use for text encoding in `FLUX.2 [dev]`. This option requires no API keys but may produce less detailed expansions. 
+Local prompt upsampling uses [`Mistral-Small-3.2-24B-Instruct-2506`](https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506), which is the model we use for text encoding in `FLUX.2 [dev]`. This option requires no API keys but may produce less detailed expansions.
 
 To enable local prompt upsampling, use `--upsample_prompt_mode=local`.
 
