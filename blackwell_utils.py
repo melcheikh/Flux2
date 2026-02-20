@@ -1,7 +1,8 @@
+import logging
+from typing import Dict
+
 import torch
 import torch.nn as nn
-from typing import Dict
-import logging
 
 try:
     from nunchaku.ops.quantize import svdq_quantize_w4a4_act_fuse_lora_cuda

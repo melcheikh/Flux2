@@ -275,9 +275,9 @@ def main(
                 print("\nbye!")
                 return
 
-    assert (
-        model_name.lower() in FLUX2_MODEL_INFO
-    ), f"{model_name} is not available, choose from {FLUX2_MODEL_INFO.keys()}"
+    assert model_name.lower() in FLUX2_MODEL_INFO, (
+        f"{model_name} is not available, choose from {FLUX2_MODEL_INFO.keys()}"
+    )
 
     model_info = FLUX2_MODEL_INFO[model_name]
     torch_device = torch.device("cuda")

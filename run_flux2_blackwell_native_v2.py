@@ -6,6 +6,7 @@ import time
 import torch
 from diffusers import Flux2Pipeline, Flux2Transformer2DModel
 from safetensors.torch import load_file
+
 from blackwell_utils import patch_flux2_with_blackwell
 
 # --- Setup Logging ---

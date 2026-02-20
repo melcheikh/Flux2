@@ -1,6 +1,7 @@
+import logging
+
 import torch
 from safetensors.torch import load_file
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

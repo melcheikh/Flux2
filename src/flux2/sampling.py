@@ -286,9 +286,9 @@ def denoise(
         img_input = img
         img_input_ids = img_ids
         if img_cond_seq is not None:
-            assert (
-                img_cond_seq_ids is not None
-            ), "You need to provide either both or neither of the sequence conditioning"
+            assert img_cond_seq_ids is not None, (
+                "You need to provide either both or neither of the sequence conditioning"
+            )
             img_input = torch.cat((img_input, img_cond_seq), dim=1)
             img_input_ids = torch.cat((img_input_ids, img_cond_seq_ids), dim=1)
         pred = model(
