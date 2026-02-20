@@ -113,7 +113,8 @@ def main() -> None:
     with torch.device("meta"):
         transformer = Flux2Transformer2DModel.from_config(transformer_config)
 
-    transformer.device = torch.device("cpu")
+    logger.info("Materializing empty Transformer on CPU...")
+    transformer = transformer.to_empty(device="cpu")
 
     logger.info("Patching Transformer with BlackwellLinear and loading weights...")
     transformer = patch_flux2_with_blackwell(transformer, checkpoint)
