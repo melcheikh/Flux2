@@ -166,9 +166,19 @@ def main() -> None:
         logger.info("[Image %s/%s] seed=%s -> %s", index + 1, args.count, current_seed, output_path)
 
         generator = torch.Generator(device=args.device).manual_seed(current_seed)
+
+        # Encode prompt on CPU to avoid GPU OOM from text encoder
+        prompt_embeds, _ = pipe.encode_prompt(
+            prompt=args.prompt,
+            device=torch.device("cpu"),
+            num_images_per_prompt=1,
+            max_sequence_length=512,
+        )
+        prompt_embeds = prompt_embeds.to(device=args.device)
+
         with torch.inference_mode():
             image = pipe(
-                prompt=args.prompt,
+                prompt_embeds=prompt_embeds,
                 generator=generator,
                 num_inference_steps=args.steps,
                 guidance_scale=args.guidance,
