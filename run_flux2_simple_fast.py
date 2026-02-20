@@ -42,6 +42,24 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
+def load_text_encoder(repo_id: str, dtype: torch.dtype, low_cpu_mem_usage: bool) -> Mistral3ForConditionalGeneration:
+    return Mistral3ForConditionalGeneration.from_pretrained(
+        repo_id,
+        subfolder="text_encoder",
+        torch_dtype=dtype,
+        device_map="cpu",
+        low_cpu_mem_usage=low_cpu_mem_usage,
+    )
+
+def load_transformer(repo_id: str, dtype: torch.dtype, low_cpu_mem_usage: bool) -> AutoModel:
+    return AutoModel.from_pretrained(
+        repo_id,
+        subfolder="transformer",
+        torch_dtype=dtype,
+        device_map="cpu",
+        low_cpu_mem_usage=low_cpu_mem_usage,
+    )
+
 def build_pipeline(
     repo_id: str,
     text_encoder,
@@ -57,6 +75,14 @@ def build_pipeline(
         low_cpu_mem_usage=low_cpu_mem_usage,
     )
 
+def rebuild_for_model_offload(repo_id: str, dtype: torch.dtype) -> tuple[Flux2Pipeline, str]:
+    print("Re-loading components for model CPU offload (no meta tensors).")
+    text_encoder = load_text_encoder(repo_id, dtype, low_cpu_mem_usage=False)
+    dit = load_transformer(repo_id, dtype, low_cpu_mem_usage=False)
+    pipe = build_pipeline(repo_id, text_encoder, dit, dtype, low_cpu_mem_usage=False)
+    pipe.enable_model_cpu_offload()
+    return pipe, "model"
+
 def main() -> None:
     args = parse_args()
 
@@ -70,20 +96,10 @@ def main() -> None:
     print("Initializing Flux 2 NF4 Pipeline (FAST, safe offload)...")
 
     print(f"Loading Text Encoder from {repo_id} (CPU first)...")
-    text_encoder = Mistral3ForConditionalGeneration.from_pretrained(
-        repo_id,
-        subfolder="text_encoder",
-        torch_dtype=dtype,
-        device_map="cpu",
-    )
+    text_encoder = load_text_encoder(repo_id, dtype, low_cpu_mem_usage=True)
 
     print(f"Loading Transformer (DiT) from {repo_id} (CPU first)...")
-    dit = AutoModel.from_pretrained(
-        repo_id,
-        subfolder="transformer",
-        torch_dtype=dtype,
-        device_map="cpu",
-    )
+    dit = load_transformer(repo_id, dtype, low_cpu_mem_usage=True)
 
     print("Assembling Pipeline...")
     pipe = build_pipeline(repo_id, text_encoder, dit, dtype)
@@ -102,14 +118,10 @@ def main() -> None:
                 offload_mode = "sequential"
             except TypeError as exc:
                 print(f"Sequential offload failed ({exc}). Falling back to model CPU offload.")
-                pipe = build_pipeline(repo_id, text_encoder, dit, dtype, low_cpu_mem_usage=False)
-                pipe.enable_model_cpu_offload()
-                offload_mode = "model"
+                pipe, offload_mode = rebuild_for_model_offload(repo_id, dtype)
     elif args.offload == "model":
         print("Using model CPU offload (slower, safest).")
-        pipe = build_pipeline(repo_id, text_encoder, dit, dtype, low_cpu_mem_usage=False)
-        pipe.enable_model_cpu_offload()
-        offload_mode = "model"
+        pipe, offload_mode = rebuild_for_model_offload(repo_id, dtype)
     else:
         print("Using sequential CPU offload (recommended).")
         try:
@@ -117,9 +129,7 @@ def main() -> None:
             offload_mode = "sequential"
         except TypeError as exc:
             print(f"Sequential offload failed ({exc}). Falling back to model CPU offload.")
-            pipe = build_pipeline(repo_id, text_encoder, dit, dtype, low_cpu_mem_usage=False)
-            pipe.enable_model_cpu_offload()
-            offload_mode = "model"
+            pipe, offload_mode = rebuild_for_model_offload(repo_id, dtype)
 
     print(f"Generating (offload={offload_mode}, steps={args.steps})...")
     generator = torch.Generator(device=args.device).manual_seed(args.seed)
