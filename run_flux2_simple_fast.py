@@ -1,12 +1,11 @@
 import argparse
 import os
 import time
-
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-
 import torch
 from diffusers import AutoModel, Flux2Pipeline
 from transformers import Mistral3ForConditionalGeneration
+
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Flux 2 NF4 fast-ish run with safe offload.")
