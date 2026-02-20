@@ -104,7 +104,7 @@ def main() -> None:
         else:
             offload_mode = "sequential"
 
-    print(f"Generating (offload={{offload_mode}}, steps={{args.steps}})...")
+    print(f"Generating (offload={offload_mode}, steps={args.steps})...")
     generator = torch.Generator(device=args.device).manual_seed(args.seed)
 
     t0 = time.time()
@@ -122,11 +122,12 @@ def main() -> None:
         torch.cuda.synchronize()
 
     elapsed = time.time() - t0
-    print(f"Done in {{elapsed:.1f}}s")
+    print(f"Done in {elapsed:.1f}s")
 
     output_path = "flux2_fast.png"
     image.save(output_path)
-    print(f"Saved to {{output_path}}")
+    print(f"Saved to {output_path}")
+
 
 if __name__ == "__main__":
     main()
