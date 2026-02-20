@@ -7,6 +7,7 @@ import time
 
 import torch
 from diffusers import Flux2Pipeline, Flux2Transformer2DModel
+from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 
 from blackwell_utils import patch_flux2_with_blackwell
@@ -19,6 +20,9 @@ DEFAULT_NVFP4_PATH = os.path.expanduser(
     "~/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-dev-NVFP4/"
     "flux2-dev-nvfp4.safetensors"
 )
+TEXT_ENCODER_REPO = "Comfy-Org/flux2-dev"
+TEXT_ENCODER_FILE = "split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors"
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Flux 2 Blackwell NVFP4 (no fallback).")
@@ -57,16 +61,24 @@ def parse_args() -> argparse.Namespace:
         help="Absolute path to flux2-dev-nvfp4.safetensors",
     )
     parser.add_argument(
+        "--text_encoder_path",
+        type=str,
+        default=None,
+        help="Optional path to text encoder safetensors (overrides hub download)",
+    )
+    parser.add_argument(
         "--tf32",
         action="store_true",
         help="Enable TF32 matmul for extra speed (may slightly affect quality)",
     )
     return parser.parse_args()
 
+
 def resolve_seed(base_seed: int | None, index: int) -> int:
     if base_seed is None:
         return random.randint(0, 2**32 - 1)
     return base_seed + index
+
 
 def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     normalized: dict[str, torch.Tensor] = {}
@@ -87,8 +99,36 @@ def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, 
         normalized[new_key] = value
     return normalized
 
+
 def build_state_dict_for_load(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     return state_dict
+
+
+def resolve_text_encoder_path(path_arg: str | None) -> str:
+    if path_arg:
+        resolved = os.path.expanduser(path_arg)
+        if not os.path.isfile(resolved):
+            raise FileNotFoundError(f"Text encoder safetensors file not found at {resolved}")
+        return resolved
+
+    return hf_hub_download(repo_id=TEXT_ENCODER_REPO, filename=TEXT_ENCODER_FILE)
+
+
+def load_text_encoder_weights(pipe: Flux2Pipeline, text_encoder_path: str) -> None:
+    text_encoder = getattr(pipe, "text_encoder", None)
+    if text_encoder is None:
+        logger.info("Text encoder: not present")
+        return
+
+    logger.info("Loading text encoder weights from %s...", text_encoder_path)
+    state_dict = load_file(text_encoder_path)
+    incompatible = text_encoder.load_state_dict(state_dict, strict=False)
+    logger.info(
+        "Text encoder state loaded. Missing keys: %s | Unexpected keys: %s",
+        len(incompatible.missing_keys),
+        len(incompatible.unexpected_keys),
+    )
+
 
 def log_text_encoder_info(pipe: Flux2Pipeline) -> None:
     text_encoder = getattr(pipe, "text_encoder", None)
@@ -120,6 +160,7 @@ def log_text_encoder_info(pipe: Flux2Pipeline) -> None:
         size_gb,
     )
 
+
 def main() -> None:
     args = parse_args()
 
@@ -134,8 +175,11 @@ def main() -> None:
             "Pass --nvfp4_path to override."
         )
 
+    text_encoder_path = resolve_text_encoder_path(args.text_encoder_path)
+
     logger.info("Pipeline base repo: %s", REPO_BASE)
     logger.info("NVFP4 safetensors path: %s", nvfp4_path)
+    logger.info("Text encoder safetensors path: %s", text_encoder_path)
 
     logger.info("Loading Flux 2 Pipeline components (VAE, T5, CLIP)...")
     pipe = Flux2Pipeline.from_pretrained(
@@ -151,6 +195,7 @@ def main() -> None:
         logger.info("Enabling model CPU offload (early)...")
         pipe.enable_model_cpu_offload()
 
+    load_text_encoder_weights(pipe, text_encoder_path)
     log_text_encoder_info(pipe)
 
     torch.cuda.empty_cache()
