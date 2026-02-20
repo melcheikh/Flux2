@@ -70,14 +70,20 @@ def resolve_seed(base_seed: int | None, index: int) -> int:
 
 def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     normalized: dict[str, torch.Tensor] = {}
-def normalize_checkpoint_keys(state_dict):
-    new_state_dict = {}  # Initialize a new dictionary to hold the updated keys
-for key, value in state_dict.items():
-        new_key = key[len("transformer.") :] if key.startswith("transformer.") else key
+    for key, value in state_dict.items():
+        new_key = key
+        if new_key.startswith("model.transformer."):
+            new_key = new_key[len("model.transformer."):]  
+        elif new_key.startswith("transformer."):
+            new_key = new_key[len("transformer."):]  
+        elif new_key.startswith("model."):
+            new_key = new_key[len("model."):]  
+
         if new_key.endswith(".weight_2"):
             base_key = new_key[: -len(".weight_2")] + ".weight"
             if base_key not in state_dict and base_key not in normalized:
                 new_key = base_key
+
         normalized[new_key] = value
     return normalized
 
@@ -177,11 +183,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-        # Strip the prefixes "model.transformer.", "transformer.", and leading "model."
-        new_key = key.replace("model.transformer.", "").replace("transformer.", "").lstrip("model.")
-        new_state_dict[new_key] = value
-        # Maintain existing handling of .weight_2
-        if ".weight_2" in new_key:
-            new_state_dict[new_key] = value
-
-    return new_state_dict  # Return the updated state_dict
