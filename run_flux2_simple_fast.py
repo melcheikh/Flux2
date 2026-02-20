@@ -8,6 +8,7 @@ from transformers import Mistral3ForConditionalGeneration
 
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Flux 2 NF4 fast-ish run with safe offload.")
     parser.add_argument(
@@ -49,6 +50,7 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
+
 def load_text_encoder(
     repo_id: str,
     dtype: torch.dtype,
@@ -62,6 +64,7 @@ def load_text_encoder(
         device_map=device_map,
         low_cpu_mem_usage=low_cpu_mem_usage,
     )
+
 
 def load_transformer(
     repo_id: str,
@@ -77,6 +80,7 @@ def load_transformer(
         low_cpu_mem_usage=low_cpu_mem_usage,
     )
 
+
 def build_pipeline(
     repo_id: str,
     text_encoder,
@@ -91,6 +95,7 @@ def build_pipeline(
         torch_dtype=dtype,
         low_cpu_mem_usage=low_cpu_mem_usage,
     )
+
 
 def rebuild_for_model_offload(repo_id: str, dtype: torch.dtype) -> tuple[Flux2Pipeline, str]:
     print("Re-loading components for model CPU offload (no meta tensors).")
@@ -109,6 +114,7 @@ def rebuild_for_model_offload(repo_id: str, dtype: torch.dtype) -> tuple[Flux2Pi
     pipe = build_pipeline(repo_id, text_encoder, dit, dtype, low_cpu_mem_usage=True)
     pipe.enable_model_cpu_offload()
     return pipe, "model"
+
 
 def main() -> None:
     args = parse_args()

@@ -17,8 +17,7 @@ logger = logging.getLogger("Flux2BlackwellNVFP4")
 
 REPO_BASE = "diffusers/FLUX.2-dev-bnb-4bit"
 DEFAULT_NVFP4_PATH = os.path.expanduser(
-    "~/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-dev-NVFP4/"
-    "flux2-dev-nvfp4.safetensors"
+    "~/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-dev-NVFP4/" "flux2-dev-nvfp4.safetensors"
 )
 TEXT_ENCODER_REPO = "Comfy-Org/flux2-dev"
 TEXT_ENCODER_FILE = "split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors"
@@ -85,11 +84,11 @@ def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, 
     for key, value in state_dict.items():
         new_key = key
         if new_key.startswith("model.transformer."):
-            new_key = new_key[len("model.transformer."):] 
+            new_key = new_key[len("model.transformer.") :]
         elif new_key.startswith("transformer."):
-            new_key = new_key[len("transformer."):] 
+            new_key = new_key[len("transformer.") :]
         elif new_key.startswith("model."):
-            new_key = new_key[len("model."):] 
+            new_key = new_key[len("model.") :]
 
         if new_key.endswith(".weight_2"):
             base_key = new_key[: -len(".weight_2")] + ".weight"
@@ -171,8 +170,7 @@ def main() -> None:
     nvfp4_path = os.path.expanduser(args.nvfp4_path)
     if not os.path.isfile(nvfp4_path):
         raise FileNotFoundError(
-            f"NVFP4 safetensors file not found at {nvfp4_path}. "
-            "Pass --nvfp4_path to override."
+            f"NVFP4 safetensors file not found at {nvfp4_path}. " "Pass --nvfp4_path to override."
         )
 
     text_encoder_path = resolve_text_encoder_path(args.text_encoder_path)
@@ -253,7 +251,13 @@ def main() -> None:
         current_seed = resolve_seed(args.seed, index)
         filename = f"{args.output_prefix}_{index + 1}.png"
         output_path = os.path.abspath(filename)
-        logger.info("[Image %s/%s] seed=%s -> %s", index + 1, args.count, current_seed, output_path)
+        logger.info(
+            "[Image %s/%s] seed=%s -> %s",
+            index + 1,
+            args.count,
+            current_seed,
+            output_path,
+        )
 
         generator = torch.Generator(device=args.device).manual_seed(current_seed)
 
@@ -280,6 +284,7 @@ def main() -> None:
 
     total_elapsed = time.perf_counter() - total_start
     logger.info("Total time: %.1f seconds", total_elapsed)
+
 
 if __name__ == "__main__":
     main()
