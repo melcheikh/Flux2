@@ -43,20 +43,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 def load_text_encoder(repo_id: str, dtype: torch.dtype, low_cpu_mem_usage: bool) -> Mistral3ForConditionalGeneration:
+    device_map = "cpu" if low_cpu_mem_usage else None
     return Mistral3ForConditionalGeneration.from_pretrained(
         repo_id,
         subfolder="text_encoder",
         torch_dtype=dtype,
-        device_map="cpu",
+        device_map=device_map,
         low_cpu_mem_usage=low_cpu_mem_usage,
     )
 
 def load_transformer(repo_id: str, dtype: torch.dtype, low_cpu_mem_usage: bool) -> AutoModel:
+    device_map = "cpu" if low_cpu_mem_usage else None
     return AutoModel.from_pretrained(
         repo_id,
         subfolder="transformer",
         torch_dtype=dtype,
-        device_map="cpu",
+        device_map=device_map,
         low_cpu_mem_usage=low_cpu_mem_usage,
     )
 
