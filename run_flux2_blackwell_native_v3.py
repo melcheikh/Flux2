@@ -68,6 +68,22 @@ def resolve_seed(base_seed: int | None, index: int) -> int:
         return random.randint(0, 2**32 - 1)
     return base_seed + index
 
+def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    if all(key.startswith("transformer.") for key in state_dict):
+        return {key[len("transformer.") :]: value for key, value in state_dict.items()}
+    if any(key.startswith("transformer.") for key in state_dict):
+        return {key[len("transformer.") :] if key.startswith("transformer.") else key: value for key, value in state_dict.items()}
+    return state_dict
+
+def build_state_dict_for_load(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+    remapped: dict[str, torch.Tensor] = {}
+    for key, value in state_dict.items():
+        if key.endswith(".weight") and value.dtype == torch.uint8:
+            remapped[key[:-7] + ".qweight"] = value
+        else:
+            remapped[key] = value
+    return remapped
+
 def main() -> None:
     args = parse_args()
 
@@ -90,14 +106,26 @@ def main() -> None:
     )
 
     logger.info("Loading NVFP4 weights from %s...", nvfp4_path)
-    checkpoint = load_file(nvfp4_path)
+    checkpoint = normalize_checkpoint_keys(load_file(nvfp4_path))
 
-    logger.info("Initializing Transformer architecture (CPU)...")
+    logger.info("Initializing Transformer architecture (meta)...")
     transformer_config = Flux2Transformer2DModel.load_config(REPO_BASE, subfolder="transformer")
-    transformer = Flux2Transformer2DModel.from_config(transformer_config)
+    with torch.device("meta"):
+        transformer = Flux2Transformer2DModel.from_config(transformer_config)
+
+    transformer.device = torch.device("cpu")
 
     logger.info("Patching Transformer with BlackwellLinear and loading weights...")
     transformer = patch_flux2_with_blackwell(transformer, checkpoint)
+
+    logger.info("Loading remaining NVFP4 weights into Transformer...")
+    state_dict_for_load = build_state_dict_for_load(checkpoint)
+    incompatible = transformer.load_state_dict(state_dict_for_load, strict=False, assign=True)
+    logger.info(
+        "NVFP4 state loaded. Missing keys: %s | Unexpected keys: %s",
+        len(incompatible.missing_keys),
+        len(incompatible.unexpected_keys),
+    )
 
     logger.info("Moving Transformer to %s...", args.device)
     transformer.to(device=args.device, dtype=torch.bfloat16)
@@ -142,6 +170,7 @@ def main() -> None:
 
     total_elapsed = time.perf_counter() - total_start
     logger.info("Total time: %.1f seconds", total_elapsed)
+
 
 if __name__ == "__main__":
     main()
