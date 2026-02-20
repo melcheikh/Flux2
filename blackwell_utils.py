@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -101,6 +101,42 @@ def _resolve_state_key(state_dict: Dict[str, torch.Tensor], key: str, prefixes: 
     return None
 
 
+def _nvfp4_key_for_module(name: str) -> Optional[Tuple[str, Optional[int]]]:
+    if name.startswith("transformer_blocks."):
+        remainder = name[len("transformer_blocks.") :]
+        block_id, _, suffix = remainder.partition(".")
+        if not block_id.isdigit():
+            return None
+        if suffix == "attn.to_q":
+            return f"double_blocks.{block_id}.img_attn.qkv", 0
+        if suffix == "attn.to_k":
+            return f"double_blocks.{block_id}.img_attn.qkv", 1
+        if suffix == "attn.to_v":
+            return f"double_blocks.{block_id}.img_attn.qkv", 2
+        if suffix == "attn.to_out.0":
+            return f"double_blocks.{block_id}.img_attn.proj", None
+        if suffix == "ff.linear_in":
+            return f"double_blocks.{block_id}.img_mlp.0", None
+        if suffix == "ff.linear_out":
+            return f"double_blocks.{block_id}.img_mlp.2", None
+        if suffix == "ff_context.linear_in":
+            return f"double_blocks.{block_id}.txt_mlp.0", None
+        if suffix == "ff_context.linear_out":
+            return f"double_blocks.{block_id}.txt_mlp.2", None
+        return None
+
+    if name.startswith("single_transformer_blocks."):
+        remainder = name[len("single_transformer_blocks.") :]
+        block_id, _, suffix = remainder.partition(".")
+        if not block_id.isdigit():
+            return None
+        if suffix == "attn.to_qkv_mlp_proj":
+            return f"single_blocks.{block_id}.linear1", None
+        if suffix == "attn.to_out":
+            return f"single_blocks.{block_id}.linear2", None
+    return None
+
+
 def patch_flux2_with_blackwell(model, state_dict: Dict[str, torch.Tensor]):
     """
     Replaces Linear layers in the transformer with BlackwellLinear and loads NVFP4 weights.
@@ -110,28 +146,33 @@ def patch_flux2_with_blackwell(model, state_dict: Dict[str, torch.Tensor]):
     # Identify modules to patch
     modules_to_patch = []
     for name, module in model.named_modules():
-        if isinstance(module, nn.Linear):
-            weight_key = _resolve_state_key(state_dict, f"{name}.weight", prefixes)
-            if not weight_key:
-                continue
-            if state_dict[weight_key].dtype != torch.uint8:
-                continue
+        if not isinstance(module, nn.Linear):
+            continue
 
-            scale_key = _resolve_state_key(state_dict, f"{name}.weight_scale", prefixes)
-            if not scale_key:
-                scale_key = _resolve_state_key(state_dict, f"{name}.weight_scale_2", prefixes)
-            if not scale_key:
-                logger.warning("Missing weight_scale for %s; skipping.", name)
-                continue
-            if state_dict[scale_key].dtype != torch.float8_e4m3fn:
-                logger.warning("Unexpected weight_scale dtype for %s: %s", name, state_dict[scale_key].dtype)
-                continue
+        mapping = _nvfp4_key_for_module(name)
+        if mapping is None:
+            continue
+        base_key, slice_index = mapping
 
-            modules_to_patch.append((name, module, weight_key, scale_key))
+        weight_key = _resolve_state_key(state_dict, f"{base_key}.weight", prefixes)
+        if weight_key is None:
+            continue
+        if state_dict[weight_key].dtype != torch.uint8:
+            continue
+
+        scale_key = _resolve_state_key(state_dict, f"{base_key}.weight_scale", prefixes)
+        if scale_key is None:
+            logger.warning("Missing weight_scale for %s; skipping.", name)
+            continue
+        if state_dict[scale_key].dtype != torch.float8_e4m3fn:
+            logger.warning("Unexpected weight_scale dtype for %s: %s", name, state_dict[scale_key].dtype)
+            continue
+
+        modules_to_patch.append((name, module, weight_key, scale_key, slice_index))
 
     logger.info("Patching %s layers with Blackwell NVFP4...", len(modules_to_patch))
 
-    for name, module, weight_key, scale_key in modules_to_patch:
+    for name, module, weight_key, scale_key, slice_index in modules_to_patch:
         # 1. Create BlackwellLinear
         # Use same bias existence and in/out features
         new_module = BlackwellLinear(
@@ -139,8 +180,16 @@ def patch_flux2_with_blackwell(model, state_dict: Dict[str, torch.Tensor]):
         ).to(device=model.device if hasattr(model, "device") else "cpu", dtype=torch.bfloat16)
 
         # 2. Load weights and scales
-        new_module.qweight.copy_(state_dict[weight_key])
-        new_module.weight_scale.copy_(state_dict[scale_key])
+        weight = state_dict[weight_key]
+        scale = state_dict[scale_key]
+        if slice_index is not None:
+            start = slice_index * module.out_features
+            end = start + module.out_features
+            weight = weight[start:end]
+            scale = scale[start:end]
+
+        new_module.qweight.copy_(weight)
+        new_module.weight_scale.copy_(scale)
         if module.bias is not None:
             bias_key = _resolve_state_key(state_dict, f"{name}.bias", prefixes)
             if bias_key is not None:
