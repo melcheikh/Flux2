@@ -90,6 +90,36 @@ def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, 
 def build_state_dict_for_load(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     return state_dict
 
+def log_text_encoder_info(pipe: Flux2Pipeline) -> None:
+    text_encoder = getattr(pipe, "text_encoder", None)
+    if text_encoder is None:
+        logger.info("Text encoder: not present")
+        return
+
+    try:
+        first_param = next(text_encoder.parameters())
+    except StopIteration:
+        logger.info("Text encoder: no parameters")
+        return
+
+    dtype = first_param.dtype
+    device = first_param.device
+    numel = sum(p.numel() for p in text_encoder.parameters())
+    if dtype.is_floating_point:
+        bytes_per = torch.finfo(dtype).bits // 8
+    else:
+        bytes_per = torch.iinfo(dtype).bits // 8
+    size_gb = numel * bytes_per / (1024**3)
+
+    logger.info(
+        "Text encoder: %s | dtype=%s | device=%s | params=%s | approx_size=%.2f GB",
+        text_encoder.__class__.__name__,
+        dtype,
+        device,
+        numel,
+        size_gb,
+    )
+
 def main() -> None:
     args = parse_args()
 
@@ -104,6 +134,9 @@ def main() -> None:
             "Pass --nvfp4_path to override."
         )
 
+    logger.info("Pipeline base repo: %s", REPO_BASE)
+    logger.info("NVFP4 safetensors path: %s", nvfp4_path)
+
     logger.info("Loading Flux 2 Pipeline components (VAE, T5, CLIP)...")
     pipe = Flux2Pipeline.from_pretrained(
         REPO_BASE,
@@ -117,6 +150,8 @@ def main() -> None:
     elif args.offload == "model":
         logger.info("Enabling model CPU offload (early)...")
         pipe.enable_model_cpu_offload()
+
+    log_text_encoder_info(pipe)
 
     torch.cuda.empty_cache()
 
