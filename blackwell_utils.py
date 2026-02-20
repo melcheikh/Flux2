@@ -43,10 +43,19 @@ class BlackwellLinear(nn.Module):
             # It returns (q_input, scales, lora_act_out)
             # Blackwell expects scale_a to be (M, K // 16) float8_e4m3fn
             # Nunchaku's oscales is (K // 16, M_pad)
+            M, K = x.shape
+            pad = 16
+            M_pad = ((M + pad - 1) // pad) * pad
+
+            lora_down = x.new_empty((K, 0))
+            lora_act_out = x.new_empty((M_pad, 0), dtype=torch.float32)
+
             qact, act_scale, _ = svdq_quantize_w4a4_act_fuse_lora_cuda(
                 x,
+                lora_down=lora_down,
+                lora_act_out=lora_act_out,
                 fp4=True,
-                pad_size=16,  # Blackwell works best with 16-aligned blocks
+                pad_size=pad,  # Blackwell works best with 16-aligned blocks
             )
             # torch._scaled_mm expects act_scale to be (M, K // 16)
             return qact, act_scale.t()
