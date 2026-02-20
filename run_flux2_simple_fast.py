@@ -91,13 +91,13 @@ def rebuild_for_model_offload(repo_id: str, dtype: torch.dtype) -> tuple[Flux2Pi
         repo_id,
         dtype,
         low_cpu_mem_usage=True,
-        device_map=None,
+        device_map="cpu",
     )
     dit = load_transformer(
         repo_id,
         dtype,
         low_cpu_mem_usage=True,
-        device_map=None,
+        device_map="cpu",
     )
     pipe = build_pipeline(repo_id, text_encoder, dit, dtype, low_cpu_mem_usage=True)
     pipe.enable_model_cpu_offload()
