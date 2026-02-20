@@ -73,11 +73,11 @@ def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, 
     for key, value in state_dict.items():
         new_key = key
         if new_key.startswith("model.transformer."):
-            new_key = new_key[len("model.transformer."):]  
+            new_key = new_key[len("model.transformer."):] 
         elif new_key.startswith("transformer."):
-            new_key = new_key[len("transformer."):]  
+            new_key = new_key[len("transformer."):] 
         elif new_key.startswith("model."):
-            new_key = new_key[len("model."):]  
+            new_key = new_key[len("model."):] 
 
         if new_key.endswith(".weight_2"):
             base_key = new_key[: -len(".weight_2")] + ".weight"
@@ -157,6 +157,16 @@ def main() -> None:
 
     logger.info("Generating %s image(s)...", args.count)
     logger.info("Prompt: %s", args.prompt)
+
+    # Force text encoder to stay on CPU to avoid OOM
+    if hasattr(pipe, "text_encoder") and pipe.text_encoder is not None:
+        pipe.text_encoder.to("cpu")
+        if hasattr(pipe.text_encoder, "_hf_hook"):
+            try:
+                pipe.text_encoder._hf_hook.offload = True
+                pipe.text_encoder._hf_hook.execution_device = torch.device("cpu")
+            except Exception:
+                pass
 
     total_start = time.perf_counter()
     for index in range(args.count):
