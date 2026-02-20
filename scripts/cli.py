@@ -28,7 +28,9 @@ from flux2.util import FLUX2_MODEL_INFO, load_ae, load_flow_model, load_text_enc
 
 @dataclass
 class Config:
-    prompt: str = "a photo of a forest with mist swirling around the tree trunks. The word 'FLUX.2' is painted over it in big, red brush strokes with visible texture"
+    prompt: str = (
+        "a photo of a forest with mist swirling around the tree trunks. The word 'FLUX.2' is painted over it in big, red brush strokes with visible texture"
+    )
     seed: Optional[int] = None
     width: int = 1360
     height: int = 768
@@ -91,7 +93,9 @@ def coerce_value(key: str, raw: str):
                     if os.path.exists(part):
                         items.append(Path(part))
                     else:
-                        print(f"File {part} not found. Skipping for now. Please check your path")
+                        print(
+                            f"File {part} not found. Skipping for now. Please check your path"
+                        )
         return items
 
     if key == "upsample_prompt_mode":
@@ -256,7 +260,9 @@ def main(
             print(f"  {i}. {name}")
         while True:
             try:
-                choice = input(f"\nSelect a model [default: {available_models[0]}]: ").strip()
+                choice = input(
+                    f"\nSelect a model [default: {available_models[0]}]: "
+                ).strip()
                 if choice == "":
                     model_name = available_models[0]
                     break
@@ -265,19 +271,23 @@ def main(
                     if 0 <= idx < len(available_models):
                         model_name = available_models[idx]
                         break
-                    print(f"Please enter a number between 1 and {len(available_models)}")
+                    print(
+                        f"Please enter a number between 1 and {len(available_models)}"
+                    )
                 elif choice.lower() in FLUX2_MODEL_INFO:
                     model_name = choice.lower()
                     break
                 else:
-                    print(f"Invalid choice. Available models: {', '.join(available_models)}")
+                    print(
+                        f"Invalid choice. Available models: {', '.join(available_models)}"
+                    )
             except (EOFError, KeyboardInterrupt):
                 print("\nbye!")
                 return
 
-    assert model_name.lower() in FLUX2_MODEL_INFO, (
-        f"{model_name} is not available, choose from {FLUX2_MODEL_INFO.keys()}"
-    )
+    assert (
+        model_name.lower() in FLUX2_MODEL_INFO
+    ), f"{model_name} is not available, choose from {FLUX2_MODEL_INFO.keys()}"
 
     model_info = FLUX2_MODEL_INFO[model_name]
     torch_device = torch.device("cuda")
@@ -289,7 +299,9 @@ def main(
         mod_and_upsampling_model = text_encoder
 
     model = load_flow_model(
-        model_name, debug_mode=debug_mode, device="cpu" if cpu_offloading else torch_device
+        model_name,
+        debug_mode=debug_mode,
+        device="cpu" if cpu_offloading else torch_device,
     )
     ae = load_ae(model_name)
     ae.eval()
@@ -332,7 +344,17 @@ def main(
                 updates = {}
             else:
                 # Check if this is plain text (no key=value pairs and not a known command)
-                known_commands = {"run", "show", "reset", "quit", "q", "exit", "help", "h", "?"}
+                known_commands = {
+                    "run",
+                    "show",
+                    "reset",
+                    "quit",
+                    "q",
+                    "exit",
+                    "help",
+                    "h",
+                    "?",
+                }
                 if "=" not in line and line.lower() not in known_commands:
                     # Treat the entire line as a prompt
                     updates = {"prompt": line}
@@ -341,14 +363,19 @@ def main(
                     try:
                         updates = parse_key_values(line)
                     except Exception as e:  # noqa: BLE001
-                        print(f"  ! Failed to parse command: {type(e).__name__}: {e}", file=sys.stderr)
+                        print(
+                            f"  ! Failed to parse command: {type(e).__name__}: {e}",
+                            file=sys.stderr,
+                        )
                         print(
                             "  ! Please check your syntax (e.g., matching quotes) and try again.\n",
                             file=sys.stderr,
                         )
                         continue
 
-                if "prompt" in updates and mod_and_upsampling_model.test_txt(updates["prompt"]):
+                if "prompt" in updates and mod_and_upsampling_model.test_txt(
+                    updates["prompt"]
+                ):
                     print(
                         "Your prompt has been flagged for potential copyright or public personas concerns. Please choose another."
                     )
@@ -358,7 +385,9 @@ def main(
                     flagged = False
                     for image in updates["input_images"]:
                         if mod_and_upsampling_model.test_image(image):
-                            print(f"The image {image} has been flagged as unsuitable. Please choose another.")
+                            print(
+                                f"The image {image} has been flagged as unsuitable. Please choose another."
+                            )
                             flagged = True
                     if flagged:
                         updates.pop("input_images")
@@ -410,7 +439,9 @@ def main(
             if cmd != "run":
                 if cmd is not None:
                     print(f"  ! Unknown command: '{cmd}'", file=sys.stderr)
-                    print("  ! Type 'help' to see available commands.\n", file=sys.stderr)
+                    print(
+                        "  ! Type 'help' to see available commands.\n", file=sys.stderr
+                    )
                 continue
 
         try:
@@ -426,11 +457,16 @@ def main(
                         f"  ! match_image_size={cfg.match_image_size} is out of range (0-{len(img_ctx) - 1})",
                         file=sys.stderr,
                     )
-                    print(f"  ! Using default dimensions: {width}x{height}", file=sys.stderr)
+                    print(
+                        f"  ! Using default dimensions: {width}x{height}",
+                        file=sys.stderr,
+                    )
                 else:
                     ref_img = img_ctx[cfg.match_image_size]
                     width, height = ref_img.size
-                    print(f"  Matched dimensions from image {cfg.match_image_size}: {width}x{height}")
+                    print(
+                        f"  Matched dimensions from image {cfg.match_image_size}: {width}x{height}"
+                    )
 
             seed = cfg.seed if cfg.seed is not None else random.randrange(2**31)
             dir = Path("output")
@@ -488,7 +524,9 @@ def main(
                                     # Fallback: parse key=value pairs separated by spaces or commas
                                     tokens = [
                                         tok
-                                        for tok in sampling_params_input.replace(",", " ").split(" ")
+                                        for tok in sampling_params_input.replace(
+                                            ",", " "
+                                        ).split(" ")
                                         if tok
                                     ]
                                     for tok in tokens:
@@ -503,13 +541,19 @@ def main(
                                             try:
                                                 if "." in v_str:
                                                     num = float(v_str)
-                                                    val = int(num) if num.is_integer() else num
+                                                    val = (
+                                                        int(num)
+                                                        if num.is_integer()
+                                                        else num
+                                                    )
                                                 else:
                                                     val = int(v_str)
                                             except Exception:
                                                 val = v_str
                                         sampling_params[k.strip()] = val
-                                print(f"  Using custom OpenRouter sampling params: {sampling_params}")
+                                print(
+                                    f"  Using custom OpenRouter sampling params: {sampling_params}"
+                                )
                             else:
                                 model_key = cfg.openrouter_model
                                 default_params = DEFAULT_SAMPLING_PARAMS.get(model_key)
@@ -527,7 +571,10 @@ def main(
                             if (
                                 openrouter_api_client is None
                                 or openrouter_api_client.model != cfg.openrouter_model
-                                or getattr(openrouter_api_client, "sampling_params", None) != sampling_params
+                                or getattr(
+                                    openrouter_api_client, "sampling_params", None
+                                )
+                                != sampling_params
                             ):
                                 openrouter_api_client = OpenRouterAPIClient(
                                     model=cfg.openrouter_model,
@@ -539,9 +586,16 @@ def main(
                             upsampled_prompts = openrouter_api_client.upsample_prompt(
                                 [cfg.prompt], img=[img_ctx] if img_ctx else None
                             )
-                            prompt = upsampled_prompts[0] if upsampled_prompts else cfg.prompt
+                            prompt = (
+                                upsampled_prompts[0]
+                                if upsampled_prompts
+                                else cfg.prompt
+                            )
                     except Exception as e:
-                        print(f"  ! Failed to upsample prompt via OpenRouter API: {e}", file=sys.stderr)
+                        print(
+                            f"  ! Failed to upsample prompt via OpenRouter API: {e}",
+                            file=sys.stderr,
+                        )
                         print(
                             "  ! Disabling OpenRouter upsampling and falling back to original prompt",
                             file=sys.stderr,
@@ -578,7 +632,9 @@ def main(
                 # Create noise
                 shape = (1, 128, height // 16, width // 16)
                 generator = torch.Generator(device="cuda").manual_seed(seed)
-                randn = torch.randn(shape, generator=generator, dtype=torch.bfloat16, device="cuda")
+                randn = torch.randn(
+                    shape, generator=generator, dtype=torch.bfloat16, device="cuda"
+                )
                 x, x_ids = batched_prc_img(randn)
 
                 timesteps = get_schedule(cfg.num_steps, x.shape[1])
@@ -616,7 +672,9 @@ def main(
                     text_encoder = text_encoder.to(torch_device)
 
                     if "klein" in model_name:
-                        mod_and_upsampling_model = mod_and_upsampling_model.to(torch_device)
+                        mod_and_upsampling_model = mod_and_upsampling_model.to(
+                            torch_device
+                        )
 
             x = x.clamp(-1, 1)
             x = rearrange(x[0], "c h w -> h w c")
@@ -624,7 +682,9 @@ def main(
             img = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())
 
             if mod_and_upsampling_model.test_image(img):
-                print("Your output has been flagged. Please choose another prompt / input image combination")
+                print(
+                    "Your output has been flagged. Please choose another prompt / input image combination"
+                )
             else:
                 exif_data = Image.Exif()
                 exif_data[ExifTags.Base.Software] = "AI generated;flux2"
@@ -634,7 +694,10 @@ def main(
 
         except Exception as e:  # noqa: BLE001
             print(f"\n  ERROR: {type(e).__name__}: {e}", file=sys.stderr)
-            print("  The model is still loaded. Please fix the error and try again.\n", file=sys.stderr)
+            print(
+                "  The model is still loaded. Please fix the error and try again.\n",
+                file=sys.stderr,
+            )
 
         if single_eval:
             break

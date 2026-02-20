@@ -146,7 +146,9 @@ def prc_img(x: Tensor, t_coord: Tensor | None = None) -> tuple[Tensor, Tensor]:
         "w": torch.arange(w),
         "l": torch.arange(1),
     }
-    x_ids = torch.cartesian_prod(x_coords["t"], x_coords["h"], x_coords["w"], x_coords["l"])
+    x_ids = torch.cartesian_prod(
+        x_coords["t"], x_coords["h"], x_coords["w"], x_coords["l"]
+    )
     x = rearrange(x, "c h w -> (h w) c")
     return x, x_ids.to(x.device)
 
@@ -194,10 +196,15 @@ def cap_pixels(img: Image.Image | list[Image.Image], k):
 
 def cap_min_pixels(img: Image.Image | list[Image.Image], max_ar=8, min_sidelength=64):
     if isinstance(img, list):
-        return [cap_min_pixels(_img, max_ar=max_ar, min_sidelength=min_sidelength) for _img in img]
+        return [
+            cap_min_pixels(_img, max_ar=max_ar, min_sidelength=min_sidelength)
+            for _img in img
+        ]
     w, h = img.size
     if w < min_sidelength or h < min_sidelength:
-        raise ValueError(f"Skipping due to minimal sidelength underschritten h {h} w {w}")
+        raise ValueError(
+            f"Skipping due to minimal sidelength underschritten h {h} w {w}"
+        )
     if w / h > max_ar or h / w > max_ar:
         raise ValueError(f"Skipping due to maximal ar overschritten h {h} w {w}")
     return img
@@ -224,7 +231,9 @@ def default_images_prep(
 
 
 def default_prep(
-    img: Image.Image | list[Image.Image], limit_pixels: int | None, ensure_multiple: int = 16
+    img: Image.Image | list[Image.Image],
+    limit_pixels: int | None,
+    ensure_multiple: int = 16,
 ) -> torch.Tensor | list[torch.Tensor]:
     img_rgb = to_rgb(img)
     img_min = cap_min_pixels(img_rgb)  # type: ignore
@@ -280,15 +289,17 @@ def denoise(
     img_cond_seq: Tensor | None = None,
     img_cond_seq_ids: Tensor | None = None,
 ):
-    guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
+    guidance_vec = torch.full(
+        (img.shape[0],), guidance, device=img.device, dtype=img.dtype
+    )
     for t_curr, t_prev in zip(timesteps[:-1], timesteps[1:]):
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
         img_input = img
         img_input_ids = img_ids
         if img_cond_seq is not None:
-            assert img_cond_seq_ids is not None, (
-                "You need to provide either both or neither of the sequence conditioning"
-            )
+            assert (
+                img_cond_seq_ids is not None
+            ), "You need to provide either both or neither of the sequence conditioning"
             img_input = torch.cat((img_input, img_cond_seq), dim=1)
             img_input_ids = torch.cat((img_input_ids, img_cond_seq_ids), dim=1)
         pred = model(
