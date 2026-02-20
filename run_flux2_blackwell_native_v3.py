@@ -17,7 +17,7 @@ logger = logging.getLogger("Flux2BlackwellNVFP4")
 REPO_BASE = "diffusers/FLUX.2-dev-bnb-4bit"
 DEFAULT_NVFP4_PATH = os.path.expanduser(
     "~/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-dev-NVFP4/"
-    "snapshots/142b87e70bc3006937b7093d89ff287b5f59f071/flux2-dev-nvfp4-mixed.safetensors"
+    "flux2-dev-nvfp4.safetensors"
 )
 
 def parse_args() -> argparse.Namespace:
@@ -54,7 +54,7 @@ def parse_args() -> argparse.Namespace:
         "--nvfp4_path",
         type=str,
         default=DEFAULT_NVFP4_PATH,
-        help="Absolute path to flux2-dev-nvfp4-mixed.safetensors",
+        help="Absolute path to flux2-dev-nvfp4.safetensors",
     )
     parser.add_argument(
         "--tf32",
@@ -80,13 +80,7 @@ def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, 
     return normalized
 
 def build_state_dict_for_load(state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-    remapped: dict[str, torch.Tensor] = {}
-    for key, value in state_dict.items():
-        if key.endswith(".weight") and value.dtype == torch.uint8:
-            remapped[key[:-7] + ".qweight"] = value
-        else:
-            remapped[key] = value
-    return remapped
+    return state_dict
 
 def main() -> None:
     args = parse_args()
@@ -108,7 +102,14 @@ def main() -> None:
         transformer=None,
         torch_dtype=torch.bfloat16,
     )
-    pipe = pipe.to("cpu")
+
+    if args.offload == "sequential":
+        logger.info("Enabling sequential CPU offload (early)...")
+        pipe.enable_sequential_cpu_offload()
+    elif args.offload == "model":
+        logger.info("Enabling model CPU offload (early)...")
+        pipe.enable_model_cpu_offload()
+
     torch.cuda.empty_cache()
 
     logger.info("Loading NVFP4 weights from %s...", nvfp4_path)
@@ -141,12 +142,6 @@ def main() -> None:
     if args.offload == "none":
         logger.info("Keeping pipeline on %s (no offload).", args.device)
         pipe = pipe.to(args.device)
-    elif args.offload == "sequential":
-        logger.info("Enabling sequential CPU offload...")
-        pipe.enable_sequential_cpu_offload()
-    else:
-        logger.info("Enabling model CPU offload...")
-        pipe.enable_model_cpu_offload()
 
     del checkpoint
     gc.collect()
