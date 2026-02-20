@@ -1,7 +1,7 @@
 import argparse
 import os
-import time
 import random
+import time
 
 import torch
 from diffusers import AutoModel, Flux2Pipeline
