@@ -1,5 +1,6 @@
 import argparse
 import random
+
 import torch
 from diffusers import AutoModel, Flux2Pipeline
 from transformers import Mistral3ForConditionalGeneration
@@ -100,7 +101,7 @@ def main():
         else:
             current_seed = random.randint(0, 2**32 - 1)
 
-        print(f"\n[Image {i+1}/{args.count}] Using seed: {current_seed}")
+        print(f"\n[Image {i + 1}/{args.count}] Using seed: {current_seed}")
 
         generator = torch.Generator(device=device).manual_seed(current_seed)
 
@@ -113,7 +114,7 @@ def main():
             width=args.width,
         ).images[0]
 
-        output_filename = f"{args.output_prefix}_{i+1}_seed_{current_seed}.png"
+        output_filename = f"{args.output_prefix}_{i + 1}_seed_{current_seed}.png"
         image.save(output_filename)
         print(f"Saved to {output_filename}")
 

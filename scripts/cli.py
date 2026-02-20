@@ -423,7 +423,7 @@ def main(
             if cfg.match_image_size is not None:
                 if cfg.match_image_size < 0 or cfg.match_image_size >= len(img_ctx):
                     print(
-                        f"  ! match_image_size={cfg.match_image_size} is out of range (0-{len(img_ctx)-1})",
+                        f"  ! match_image_size={cfg.match_image_size} is out of range (0-{len(img_ctx) - 1})",
                         file=sys.stderr,
                     )
                     print(f"  ! Using default dimensions: {width}x{height}", file=sys.stderr)
