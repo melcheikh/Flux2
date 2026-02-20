@@ -36,6 +36,13 @@ def parse_args() -> argparse.Namespace:
         help="Offload strategy: sequential (fastest-safe), model (slow), none (try full GPU)",
     )
     parser.add_argument(
+        "--preset",
+        type=str,
+        default="default",
+        choices=["default", "fast"],
+        help="Preset configuration: default or fast",
+    )
+    parser.add_argument(
         "--tf32",
         action="store_true",
         help="Enable TF32 matmul for extra speed (may slightly affect quality)",
@@ -105,6 +112,15 @@ def rebuild_for_model_offload(repo_id: str, dtype: torch.dtype) -> tuple[Flux2Pi
 
 def main() -> None:
     args = parse_args()
+
+    if args.preset == "fast":
+        args.steps = 24
+        args.guidance = 3.5
+        args.width = 896
+        args.height = 896
+        args.tf32 = True
+        if args.offload == "sequential":
+            args.offload = "model"
 
     if args.tf32:
         torch.backends.cuda.matmul.allow_tf32 = True
