@@ -72,10 +72,10 @@ def normalize_checkpoint_keys(state_dict: dict[str, torch.Tensor]) -> dict[str, 
     normalized: dict[str, torch.Tensor] = {}
     for key, value in state_dict.items():
         new_key = key[len("transformer.") :] if key.startswith("transformer.") else key
-        if new_key.endswith(".weight_scale_2"):
-            new_key = new_key[: -len(".weight_scale_2")] + ".weight_scale"
-        elif new_key.endswith(".weight_2"):
-            new_key = new_key[: -len(".weight_2")] + ".weight"
+        if new_key.endswith(".weight_2"):
+            base_key = new_key[: -len(".weight_2")] + ".weight"
+            if base_key not in state_dict and base_key not in normalized:
+                new_key = base_key
         normalized[new_key] = value
     return normalized
 
