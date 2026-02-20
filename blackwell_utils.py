@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Iterable
 
 import torch
 import torch.nn as nn
@@ -93,21 +93,45 @@ class BlackwellLinear(nn.Module):
         return res.view(*orig_shape[:-1], self.out_features)
 
 
+def _resolve_state_key(state_dict: Dict[str, torch.Tensor], key: str, prefixes: Iterable[str]) -> str | None:
+    for prefix in prefixes:
+        candidate = f"{prefix}{key}"
+        if candidate in state_dict:
+            return candidate
+    return None
+
+
 def patch_flux2_with_blackwell(model, state_dict: Dict[str, torch.Tensor]):
     """
     Replaces Linear layers in the transformer with BlackwellLinear and loads NVFP4 weights.
     """
+    prefixes = ("", "transformer.", "model.")
+
     # Identify modules to patch
     modules_to_patch = []
     for name, module in model.named_modules():
         if isinstance(module, nn.Linear):
-            # Only patch if we have corresponding quantized weights in state_dict
-            if f"{name}.weight" in state_dict and state_dict[f"{name}.weight"].dtype == torch.uint8:
-                modules_to_patch.append((name, module))
+            weight_key = _resolve_state_key(state_dict, f"{name}.weight", prefixes)
+            if not weight_key:
+                continue
+            if state_dict[weight_key].dtype != torch.uint8:
+                continue
 
-    logger.info(f"Patching {len(modules_to_patch)} layers with Blackwell NVFP4...")
+            scale_key = _resolve_state_key(state_dict, f"{name}.weight_scale", prefixes)
+            if not scale_key:
+                scale_key = _resolve_state_key(state_dict, f"{name}.weight_scale_2", prefixes)
+            if not scale_key:
+                logger.warning("Missing weight_scale for %s; skipping.", name)
+                continue
+            if state_dict[scale_key].dtype != torch.float8_e4m3fn:
+                logger.warning("Unexpected weight_scale dtype for %s: %s", name, state_dict[scale_key].dtype)
+                continue
 
-    for name, module in modules_to_patch:
+            modules_to_patch.append((name, module, weight_key, scale_key))
+
+    logger.info("Patching %s layers with Blackwell NVFP4...", len(modules_to_patch))
+
+    for name, module, weight_key, scale_key in modules_to_patch:
         # 1. Create BlackwellLinear
         # Use same bias existence and in/out features
         new_module = BlackwellLinear(
@@ -115,11 +139,12 @@ def patch_flux2_with_blackwell(model, state_dict: Dict[str, torch.Tensor]):
         ).to(device=model.device if hasattr(model, "device") else "cpu", dtype=torch.bfloat16)
 
         # 2. Load weights and scales
-        new_module.qweight.copy_(state_dict[f"{name}.weight"])
-        new_module.weight_scale.copy_(state_dict[f"{name}.weight_scale"])
+        new_module.qweight.copy_(state_dict[weight_key])
+        new_module.weight_scale.copy_(state_dict[scale_key])
         if module.bias is not None:
-            if f"{name}.bias" in state_dict:
-                new_module.bias.data.copy_(state_dict[f"{name}.bias"])
+            bias_key = _resolve_state_key(state_dict, f"{name}.bias", prefixes)
+            if bias_key is not None:
+                new_module.bias.data.copy_(state_dict[bias_key])
             else:
                 new_module.bias.data.zero_()
 
