@@ -42,8 +42,12 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
-def load_text_encoder(repo_id: str, dtype: torch.dtype, low_cpu_mem_usage: bool) -> Mistral3ForConditionalGeneration:
-    device_map = "cpu" if low_cpu_mem_usage else None
+def load_text_encoder(
+    repo_id: str,
+    dtype: torch.dtype,
+    low_cpu_mem_usage: bool,
+    device_map: str | None,
+) -> Mistral3ForConditionalGeneration:
     return Mistral3ForConditionalGeneration.from_pretrained(
         repo_id,
         subfolder="text_encoder",
@@ -52,8 +56,12 @@ def load_text_encoder(repo_id: str, dtype: torch.dtype, low_cpu_mem_usage: bool)
         low_cpu_mem_usage=low_cpu_mem_usage,
     )
 
-def load_transformer(repo_id: str, dtype: torch.dtype, low_cpu_mem_usage: bool) -> AutoModel:
-    device_map = "cpu" if low_cpu_mem_usage else None
+def load_transformer(
+    repo_id: str,
+    dtype: torch.dtype,
+    low_cpu_mem_usage: bool,
+    device_map: str | None,
+) -> AutoModel:
     return AutoModel.from_pretrained(
         repo_id,
         subfolder="transformer",
@@ -79,9 +87,19 @@ def build_pipeline(
 
 def rebuild_for_model_offload(repo_id: str, dtype: torch.dtype) -> tuple[Flux2Pipeline, str]:
     print("Re-loading components for model CPU offload (no meta tensors).")
-    text_encoder = load_text_encoder(repo_id, dtype, low_cpu_mem_usage=False)
-    dit = load_transformer(repo_id, dtype, low_cpu_mem_usage=False)
-    pipe = build_pipeline(repo_id, text_encoder, dit, dtype, low_cpu_mem_usage=False)
+    text_encoder = load_text_encoder(
+        repo_id,
+        dtype,
+        low_cpu_mem_usage=True,
+        device_map=None,
+    )
+    dit = load_transformer(
+        repo_id,
+        dtype,
+        low_cpu_mem_usage=True,
+        device_map=None,
+    )
+    pipe = build_pipeline(repo_id, text_encoder, dit, dtype, low_cpu_mem_usage=True)
     pipe.enable_model_cpu_offload()
     return pipe, "model"
 
@@ -98,10 +116,20 @@ def main() -> None:
     print("Initializing Flux 2 NF4 Pipeline (FAST, safe offload)...")
 
     print(f"Loading Text Encoder from {repo_id} (CPU first)...")
-    text_encoder = load_text_encoder(repo_id, dtype, low_cpu_mem_usage=True)
+    text_encoder = load_text_encoder(
+        repo_id,
+        dtype,
+        low_cpu_mem_usage=True,
+        device_map="cpu",
+    )
 
     print(f"Loading Transformer (DiT) from {repo_id} (CPU first)...")
-    dit = load_transformer(repo_id, dtype, low_cpu_mem_usage=True)
+    dit = load_transformer(
+        repo_id,
+        dtype,
+        low_cpu_mem_usage=True,
+        device_map="cpu",
+    )
 
     print("Assembling Pipeline...")
     pipe = build_pipeline(repo_id, text_encoder, dit, dtype)
