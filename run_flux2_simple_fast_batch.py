@@ -214,7 +214,7 @@ def main() -> None:
             torch.cuda.synchronize()
 
         elapsed = time.time() - t0
-        print(f"Done in {{elapsed:.1f}}s")
+        print(f"Tiempo transcurrido: {elapsed}")
         image.save(filename)
 
     print("Batch complete.")
