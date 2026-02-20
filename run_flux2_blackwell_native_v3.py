@@ -107,7 +107,6 @@ def main() -> None:
         REPO_BASE,
         transformer=None,
         torch_dtype=torch.bfloat16,
-        device_map="cpu",
     )
     pipe = pipe.to("cpu")
     torch.cuda.empty_cache()
