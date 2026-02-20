@@ -42,6 +42,14 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
+def build_pipeline(repo_id: str, text_encoder, transformer, dtype: torch.dtype) -> Flux2Pipeline:
+    return Flux2Pipeline.from_pretrained(
+        repo_id,
+        text_encoder=text_encoder,
+        transformer=transformer,
+        torch_dtype=dtype,
+    )
+
 def main() -> None:
     args = parse_args()
 
@@ -71,12 +79,7 @@ def main() -> None:
     )
 
     print("Assembling Pipeline...")
-    pipe = Flux2Pipeline.from_pretrained(
-        repo_id,
-        text_encoder=text_encoder,
-        transformer=dit,
-        torch_dtype=dtype,
-    )
+    pipe = build_pipeline(repo_id, text_encoder, dit, dtype)
 
     offload_mode = args.offload
     if args.offload == "none":
@@ -87,8 +90,14 @@ def main() -> None:
         except torch.cuda.OutOfMemoryError:
             print("OOM -> falling back to sequential CPU offload")
             torch.cuda.empty_cache()
-            pipe.enable_sequential_cpu_offload()
-            offload_mode = "sequential"
+            try:
+                pipe.enable_sequential_cpu_offload()
+                offload_mode = "sequential"
+            except TypeError as exc:
+                print(f"Sequential offload failed ({exc}). Falling back to model CPU offload.")
+                pipe = build_pipeline(repo_id, text_encoder, dit, dtype)
+                pipe.enable_model_cpu_offload()
+                offload_mode = "model"
     elif args.offload == "model":
         print("Using model CPU offload (slower, safest).")
         pipe.enable_model_cpu_offload()
@@ -97,12 +106,12 @@ def main() -> None:
         print("Using sequential CPU offload (recommended).")
         try:
             pipe.enable_sequential_cpu_offload()
+            offload_mode = "sequential"
         except TypeError as exc:
             print(f"Sequential offload failed ({exc}). Falling back to model CPU offload.")
+            pipe = build_pipeline(repo_id, text_encoder, dit, dtype)
             pipe.enable_model_cpu_offload()
             offload_mode = "model"
-        else:
-            offload_mode = "sequential"
 
     print(f"Generating (offload={offload_mode}, steps={args.steps})...")
     generator = torch.Generator(device=args.device).manual_seed(args.seed)
